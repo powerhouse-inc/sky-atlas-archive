@@ -1,0 +1,38 @@
+name: Commit Atlas Files from Webhook
+
+on:
+  repository_dispatch:
+    types: [atlas_tree_update]
+
+jobs:
+  commit-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Write files from payload
+        env:
+          ATLAS_JSON: ${{ github.event.client_payload.atlasTreeJson }}
+          SIMPLIFIED_TXT: ${{ github.event.client_payload.simplifiedAtlasTreeTxt }}
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+
+          # Root-level files
+          echo "$ATLAS_JSON" > atlas-tree.json
+          echo "$SIMPLIFIED_TXT" > simplified-atlas-tree.txt
+
+          # Timestamped snapshots
+          mkdir -p snapshots
+          echo "$ATLAS_JSON" > "snapshots/${TIMESTAMP}.json"
+          echo "$SIMPLIFIED_TXT" > "snapshots/${TIMESTAMP}-simplified-atlas-tree.txt"
+
+      - name: Commit and Push changes
+        run: |
+          git add atlas-tree.json simplified-atlas-tree.txt snapshots/
+          git commit -m "Update atlas-tree files (${TIMESTAMP})" --allow-empty
+          git push origin main
